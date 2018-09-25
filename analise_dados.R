@@ -1,6 +1,7 @@
 # Carrega a base de dados:
 
 load("dados_2017.rda")
+ibge_subsetor <- read_delim(file = "ibge_subsetor.txt", delim = ";", col_types = "cc")
 
 # Carrega pacotes necessários
 require(tidyverse)
@@ -18,53 +19,83 @@ dados %>%
   summarise(qtd = n()) %>% 
   spread(key = admitidos_desligados, value = qtd)
 
+# 1. Gráfico de Pirâmide
 
+# Gera base para o gráfico
 base <- dados %>% 
   select(ibge_subsetor, sexo, salario_mensal) %>% 
   filter(ibge_subsetor != "{ñ") %>% 
-  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", "."))) %>% 
-  group_by(ibge_subsetor, sexo) %>% 
-  summarise(qtd_total = n(),
-                media = mean(salario_mensal))
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", ".")),
+         sexo = ifelse(sexo=="01", "Masculino", "Feminino")) %>% 
+  inner_join(ibge_subsetor) %>% 
+  group_by(ibge_subsetor_descricao, sexo) %>% 
+  summarise(media = median(salario_mensal)) %>% 
+  mutate(media = if_else(sexo == "Masculino", -media, media)) %>% 
+  spread(key = sexo, value = media) %>% 
+  arrange(Feminino) %>% 
+  ungroup() %>% 
+  mutate(ibge_subsetor_descricao = factor(ibge_subsetor_descricao, levels = ibge_subsetor_descricao))
+
+# Gera o gráfico:
+
+base %>%
+  plot_ly(x=~Feminino, 
+          y=~ibge_subsetor_descricao, 
+          type = 'bar', 
+          orientation = 'h', 
+          name = "Feminino", 
+          sizes = c(1800,1800),
+          marker = list(color = 'rgba(246, 78, 139, 0.6)'), 
+          hoverinfo = 'text', 
+          text = ~paste0("R$ ", formatC(abs(Feminino), format = 'f', digits = 2, big.mark = ".", decimal.mark = ","))) %>% 
+  add_trace(x=~Masculino, 
+            name = "Masculino", 
+            marker = list(color = 'rgba(158, 202, 225, 0.6)'),
+            hoverinfo = 'text', 
+            text = ~paste0("R$ ", formatC(abs(Masculino), format = 'f', digits = 2, big.mark = ".", decimal.mark = ","))) %>% 
+  layout(barmode = 'overlay',
+         title = "Remuneração mediana por sexo e subsetor do IBGE",
+         xaxis = list(title = "Remuneração média"),
+         yaxis = list(title = ""),
+         margin = list(l = 250))
 
 
-base %>% 
-  ggplot(aes(x = reorder(ibge_subsetor, media, mean), y = media, fill = sexo)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label=format(media/1000, digits = 3)), position = position_dodge(width=1)) +
-  coord_flip() +
-  labs(title = "Remuneração média por sexo e subsetor do IBGE", x = "Subsetor IBGE", y = "Remuneração média")
+# 2. Variação de remuneração por idade e sexo:
+
+x <- dados %>% 
+  group_by(idade) %>% 
+  summarise(count = n())
+
+base2 <- dados %>% 
+  select(idade, sexo, salario_mensal) %>% 
+  mutate(idade = as.numeric(idade),
+         salario_mensal = as.numeric(str_replace(salario_mensal, ",", ".")),
+         sexo = ifelse(sexo=="01", "Masculino", "Feminino")) %>% 
+  filter(between(idade, 16, 75)) %>% 
+  group_by(idade, sexo) %>% 
+  summarise(media = median(salario_mensal)) %>% 
+  spread(key = sexo, value = media)
 
 
-
-
-
-
-base %>% 
-  mutate(media = if_else(sexo == "01", -media, media)) %>% 
-ggplot(aes(x = reorder(ibge_subsetor, abs(media), mean), y = media, group = sexo, fill = sexo)) +
-  geom_bar(stat = "identity", width = 0.75) +
-  scale_y_continuous(labels = abs) +
-  geom_text(aes(label=format(media/1000, digits = 3)), position = position_dodge(width=1)) +
-  coord_flip() +
-  labs(y = "Remuneração Média", x = "Subsetor Econômico - IBGE", title = "Remuneração Média por Sexo e Subsetor") +
-  theme(legend.position = "bottom") +
-  scale_fill_manual(values=c("blue", "red"),
-                    name="",
-                    breaks=c("Masculino", "Feminino"),
-                    labels=c("Masculino", "Feminino")) +
-  scale_y_continuous(breaks = seq(-5000, 5000, 500), 
-                     labels = abs(seq(-5000, 5000, 500))) 
+base2 %>% 
+  plot_ly(x=~idade, 
+          y=~Feminino, 
+          type = 'scatter', 
+          mode = 'markers', 
+          name = 'Feminino', 
+          marker = list(color = 'rgba(246, 78, 139, 0.6)'),
+          hoverinfo = 'text', 
+          text = ~paste0("R$ ", formatC(abs(Feminino), format = 'f', digits = 2, big.mark = ".", decimal.mark = ","))) %>% 
+  add_markers(y=~Masculino, 
+              name = 'Masculino',
+              marker = list(color = 'rgba(158, 202, 225, 0.6)'),
+              hoverinfo = 'text', 
+              text = ~paste0("R$ ", formatC(abs(Masculino), format = 'f', digits = 2, big.mark = ".", decimal.mark = ","))) %>% 
+  layout(title = 'Remuneração mediana x idade por sexo',
+         xaxis = list(title = "Idade"),
+         yaxis = list(title = "Remuneração Mediana"))
 
   
-
-
-
-#análise para fezer
-#saldo de empregos por estado (separar masculino e feminino)
-# média salarial homens e mulheres por grau de instrução, tamanho estabelecimento, estado, subsetor, raça, idade e tempo de emprego
-
-
   
 # Análise CBO
   
