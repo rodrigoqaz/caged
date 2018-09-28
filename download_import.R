@@ -29,5 +29,6 @@ for (i in 1:8){
   gc(reset = T) #limpa memoria
 }
 
+
 #salva o conjunto de dados em um arquivo rda:
 save(dados, file = "dados_2017.rda")

@@ -1,0 +1,26 @@
+ibge_subsetor_descricao;ibge_subsetor
+Extrativa mineral;1
+Indústria de produtos minerais nao metálicos;2
+Indústria metalúrgica;3
+Indústria mecânica;4
+Indústria do material elétrico e de comunicaçoes;5
+Indústria do material de transporte;6
+Indústria da madeira e do mobiliário;7
+Indústria do papel, papelao, editorial e gráfica;8
+Ind. da borracha, fumo, couros, peles, similares, ind. diversas;9
+Ind. química de produtos farmacêuticos, veterinários, perfumaria;10
+Indústria têxtil do vestuário e artefatos de tecidos;11
+Indústria de calçados;12
+Indústria de produtos alimentícios, bebidas e álcool etílico;13
+Serviços industriais de utilidade pública;14
+Construçao civil;15
+Comércio varejista;16
+Comércio atacadista;17
+Instituiçoes de crédito, seguros e capitalizaçao;18
+Com. e administraçao de imóveis, valores mobiliários, serv. Técnico;19
+Transportes e comunicaçoes;20
+Serv. de alojamento, alimentaçao, reparaçao, manutençao, redaçao;21
+Serviços médicos, odontológicos e veterinários;22
+Ensino;23
+Administraçao pública direta e autárquica;24
+Agricultura, silvicultura, criaçao de animais, extrativismo vegetal;25
