@@ -8,7 +8,7 @@ output: ioslides_presentation
 
 ```{r setup, include=FALSE}
 # Verifica se os pacotes estão instalados na máquina, senão, instala e depois carrega:
-list.of.packages <- c("tidyverse", "plotly", "janitor", "rgdal", "RColorBrewer", "leaflet", "webshot")
+list.of.packages <- c("tidyverse", "plotly", "janitor", "rgdal", "RColorBrewer", "leaflet", "webshot", "kableExtra")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 lapply(list.of.packages, require, character.only=TRUE)
@@ -16,9 +16,21 @@ lapply(list.of.packages, require, character.only=TRUE)
 # Carrega as bases de dados:
 load("dados_2017.rda")
 ibge_subsetor <- read_delim(file = "ibge_subsetor.txt", delim = ";", col_types = "cc")
+cbo <- read_delim(file = "cbo_ocupacao.txt", delim = ":", col_types = "ic")
 
 # Limpa o nome das variáveis:
 names(dados) <- dados %>% clean_names() %>% names
+
+# Seleciona amostra dos dados:
+aux <- dados %>% 
+  select(salario_mensal) %>% 
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", ".")))
+
+sigma <- sd(aux$salario_mensal)
+n <- (qnorm(0.95) * sigma)^2/50
+
+amostra <- dados[sample(nrow(dados), 197810), ]
+
 
 ```
 
@@ -27,6 +39,18 @@ names(dados) <- dados %>% clean_names() %>% names
 Será que as mulheres ganham menos que homens!?
 
 ![](imagens/fry_2.png)
+
+## Notícias
+
+![](imagens/noticia_01.PNG)
+
+## Notícias
+
+![](imagens/noticia_02.PNG)
+
+## Notícias
+
+![](imagens/noticia_03.PNG)
 
 ## Onde buscar os dados para resolver essa dúvida?
 
@@ -75,6 +99,49 @@ Fonte: [http://pdet.mte.gov.br/o-que-e-caged](http://pdet.mte.gov.br/o-que-e-cag
 ## Vamos ao code!
 
 ![](imagens/codecode.gif)
+
+
+## Resumo dos dados
+
+```{r echo=FALSE}
+dados %>%
+  select(sexo, salario_mensal) %>% 
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", ".")),
+         sexo = ifelse(sexo=="01", "Masculino", "Feminino")) %>% 
+  group_by(sexo) %>% 
+  summarize(min = min(salario_mensal),
+            q1 = quantile(salario_mensal,0.25),
+            md = median(salario_mensal),
+            q3 = quantile(salario_mensal,0.75),
+            max = max(salario_mensal),
+            media = mean(salario_mensal),
+            desv.pad = sd(salario_mensal),
+            qtd = n()) %>% 
+  t() %>% 
+  kable(align = "c") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+
+## Histograma por sexo
+
+```{r echo=FALSE}
+dados %>%
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", "."))) %>%
+  plot_ly(alpha = 0.7) %>%
+  add_histogram(x = ~log(salario_mensal[sexo=='01']), 
+                histnorm = 'probability', 
+                nbinsx = 70, 
+                name = "Masculino", 
+                marker = list(color = 'rgba(158, 202, 225, 0.6)')) %>%
+  add_histogram(x = ~log(salario_mensal[sexo=='02']), 
+                histnorm = 'probability', 
+                nbinsx = 70, 
+                name = "Feminino", 
+                marker = list(color = 'rgba(246, 78, 139, 0.6)')) %>%
+  layout(barmode = "overlay", xaxis = list(title = "Ln do salário"))
+```
+
 
 ## Remuneração mediana por sexo e subsetor IBGE
 
@@ -214,3 +281,120 @@ leaflet(data = base_grafico) %>%
             opacity = 1)
 ```
 
+
+## Top 10 cargos mais comuns
+
+```{r echo=FALSE}
+top_10 <- dados %>% 
+  group_by(cbo_2002_ocupacao) %>% 
+  summarise(qtd = n()) %>% 
+  ungroup() %>% 
+  arrange(desc(qtd)) %>% 
+  top_n(10, wt = qtd)
+
+dados %>% 
+  filter(cbo_2002_ocupacao %in% top_10$cbo_2002_ocupacao) %>% 
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", ".")),
+       sexo = ifelse(sexo=="01", "Masculino", "Feminino")) %>% 
+  inner_join(cbo, by = c("cbo_2002_ocupacao"="codigo")) %>% 
+  group_by(cbo_2002_ocupacao, ocupacao, sexo) %>% 
+  summarise(media = mean(salario_mensal)) %>% 
+  spread(key = sexo, value = media) %>% 
+  arrange(factor(cbo_2002_ocupacao, levels = top_10$cbo_2002_ocupacao)) %>% 
+  ungroup() %>%
+  select(-cbo_2002_ocupacao) %>% 
+  mutate(diferenca = paste0(formatC((Masculino / Feminino - 1)*100, format = 'f', digits = 2, big.mark = ".", decimal.mark = ","), "%")) %>% 
+  kable(align = "c") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), font_size = 12)
+```
+
+
+
+## Top 10 maiores cargos
+
+```{r echo=FALSE}
+top_10_v <- dados %>% 
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", "."))) %>% 
+  group_by(cbo_2002_ocupacao) %>% 
+  summarise(valor = mean(salario_mensal)) %>% 
+  ungroup() %>% 
+  arrange(desc(valor)) %>% 
+  top_n(11, wt = valor)
+
+dados %>% 
+  filter(cbo_2002_ocupacao %in% top_10_v$cbo_2002_ocupacao) %>% 
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", ".")),
+         sexo = ifelse(sexo=="01", "Masculino", "Feminino")) %>% 
+  inner_join(cbo, by = c("cbo_2002_ocupacao"="codigo")) %>% 
+  group_by(cbo_2002_ocupacao, ocupacao, sexo) %>% 
+  summarise(media = mean(salario_mensal)) %>% 
+  spread(key = sexo, value = media) %>% 
+  arrange(factor(cbo_2002_ocupacao, levels = top_10_v$cbo_2002_ocupacao)) %>% 
+  filter(cbo_2002_ocupacao != 215110) %>% 
+  ungroup() %>% 
+  select(-cbo_2002_ocupacao) %>% 
+  mutate(diferenca = paste0(formatC((Masculino / Feminino - 1)*100, format = 'f', digits = 2, big.mark = ".", decimal.mark = ","), "%")) %>% 
+  kable(align = "c") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), font_size = 12)
+```
+
+
+
+## Faixas de salário
+
+```{r echo=FALSE}
+faixas <- c(0, 1000, 2000, 3000)
+
+x <- dados %>% 
+  mutate(salario_mensal = as.numeric(str_replace(salario_mensal, ",", ".")),
+         sexo = ifelse(sexo=="01", "Masculino", "Feminino"),
+         faixa = cut(salario_mensal, breaks = faixas)) %>% 
+  group_by(faixa, sexo) %>% 
+  summarise(qtd = n()) %>% 
+  spread(sexo, qtd) %>% 
+  ungroup() %>% 
+  mutate(perc_feminino = -Feminino / (Feminino+Masculino),
+         perc_masculino = Masculino / (Feminino+Masculino))
+
+
+x$faixa <- factor(c("até 1.000", "1.000 a 2.000", "2.000 a 3.000", "acima de 3.000"), levels = c("até 1.000", "1.000 a 2.000", "2.000 a 3.000", "acima de 3.000"))
+
+x %>%
+  plot_ly(x=~perc_feminino, 
+          y=~faixa, 
+          type = 'bar', 
+          orientation = 'h', 
+          name = "Feminino", 
+          sizes = c(1800,1800),
+          marker = list(color = 'rgba(246, 78, 139, 0.6)'), 
+          hoverinfo = 'text', 
+          text = ~paste0(formatC(abs(perc_feminino*100), format = 'f', digits = 2, big.mark = ".", decimal.mark = ","), "%")) %>% 
+  add_trace(x=~perc_masculino, 
+            name = "Masculino", 
+            marker = list(color = 'rgba(158, 202, 225, 0.6)'),
+            hoverinfo = 'text', 
+            text = ~paste0(formatC(abs(perc_masculino*100), format = 'f', digits = 2, big.mark = ".", decimal.mark = ","), "%")) %>% 
+  layout(barmode = 'overlay',
+         title = "Proporção de pessoas por faixa salarial e sexo",
+         xaxis = list(title = "Proporção", range = c(-1,1)),
+         yaxis = list(title = ""))
+
+```
+
+
+
+## Conclusão
+
+Sim, homens ganham mais que mulheres!!
+
+
+
+## Obrigado!
+
+![](imagens/spock.gif)
+
+
+
+## Agora é hora da maldade!
+
+![](imagens/bender.png)
